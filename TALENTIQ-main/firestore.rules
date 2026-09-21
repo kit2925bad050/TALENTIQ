@@ -1,0 +1,67 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isHRAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'hr_admin' ||
+        request.auth.token.email.matches('.*admin.*') ||
+        request.auth.token.email.matches('.*hr.*')
+      );
+    }
+
+    // 1. Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) || isHRAdmin();
+    }
+
+    // 2. Employees collection (Profiles, Extracted Skills, Hidden Skills)
+    match /employees/{employeeId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(employeeId) || isHRAdmin();
+    }
+
+    // 3. Internal Roles & Vacancies (Readable by all employees, writable by HR)
+    match /roles/{roleId} {
+      allow read: if isAuthenticated();
+      allow write: if isHRAdmin();
+    }
+
+    // 4. Learning Paths & AI Skill Mentor
+    match /learning_paths/{pathId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // 5. Skill Progress & Mastery
+    match /skill_progress/{progressId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // 6. Quiz Attempts & Assessments
+    match /assessments/{assessmentId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // 7. Real-time Notifications
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // 8. Default fallback for development/hackathon testing
+    match /{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}
